@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Time Reporting</title>
+    <style>
+        body {
+            background-color: RGB(238, 238, 238);
+        }
+
+        table,
+        th,
+        td {
+            border: 1px solid black;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 5px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        #reportingSection {
+            display: none;
+        }
+
+        #loadingSpinner {
+            display: none;
+            border: 16px solid #f3f3f3;
+            border-top: 16px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #reportHoursBtn {
+            margin-top: 10px;
+        }
+
+        #weatherReport {
+            display: none;
+        }
+
+        #registerButton {
+            margin-top: 10px;
+        }
+
+        #registerSection {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loginSection">
+        <h2>Login</h2>
+        <form id="loginForm">
+            <label for="email">Email:</label>
+            <input type="email" id="login-email" name="email" required>
+            <label for="password">Password:</label>
+            <input type="password" id="login-password" name="password" required>
+            <button type="submit">Login</button>
+        </form>
+        <button id="registerButton" onclick="showRegisterSection()">Register instead</button>
+    </div>
+
+    <div id="registerSection">
+        <h2>Register</h2>
+        <form id="registerForm">
+            <label for="email">Email:</label>
+            <input type="email" id="register-email" name="email" required>
+            <label for="password">Password:</label>
+            <input type="password" id="register-password" name="password" required>
+            <button type="submit">Register</button>
+        </form>
+    </div>
+
+    <div id="loadingSpinner"></div>
+
+    <div id="reportingSection">
+        <h1 id="welcomeMessage"></h1>
+
+        <div id="weatherReport">
+            <p id="temp"></p>
+            <p id="cond"></p>
+            <img id="cond-icon" src="">
+        </div>
+
+        <button id="logoutButton">Logout</button>
+
+        <h2>Weekly Input for Year 2024</h2>
+
+        <button id="prevWeek">Previous Week</button>
+        <button id="nextWeek">Next Week</button>
+        <p id="currentWeekLabel"></p>
+
+        <table id="weekTable">
+            <thead>
+                <tr>
+                    <th>Week</th>
+                    <th>Monday</th>
+                    <th>Tuesday</th>
+                    <th>Wednesday</th>
+                    <th>Thursday</th>
+                    <th>Friday</th>
+                    <th>Saturday</th>
+                    <th>Sunday</th>
+                </tr>
+            </thead>
+            <tbody>
+
+            </tbody>
+        </table>
+
+        <button id="reportHoursBtn">Report hours</button>
+    </div>
+
+    <script>
+
+        const year = 2024;
+
+        let currentWeek = getCurrentWeekNumber();
+        let token = '';
+        let userId = '';
+
+
+        const empty_report = [
+            { hours_work: 0, hours_vacation: 0 },
+            { hours_work: 0, hours_vacation: 0 },
+            { hours_work: 0, hours_vacation: 0 },
+            { hours_work: 0, hours_vacation: 0 },
+            { hours_work: 0, hours_vacation: 0 },
+            { hours_work: 0, hours_vacation: 0 },
+            { hours_work: 0, hours_vacation: 0 }
+        ];
+
+
+        async function fetchTableDataForWeek(weekStartDate) {
+            const url = `http://localhost:3001/api/report?weekStartDate=${encodeURIComponent(weekStartDate)}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `bearer ${token}`
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(data);
+                    return data.days;
+                } else {
+                    console.log(response);
+                    return empty_report;
+                }
+            } catch (error) {
+                console.log(error);
+                alert('Failed to fetch data.');
+                return null;
+            }
+        }
+
+        function showRegisterSection() {
+            document.getElementById('reportingSection').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('loadingSpinner').style.display = 'none';
+            document.getElementById('registerSection').style.display = 'block';
+        }
+
+        function showLoginSection() {
+            document.getElementById('reportingSection').style.display = 'none';
+            document.getElementById('loadingSpinner').style.display = 'none';
+            document.getElementById('registerSection').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'block';
+        }
+
+        function showSpinner() {
+            document.getElementById('reportingSection').style.display = 'none';
+            document.getElementById('registerSection').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('loadingSpinner').style.display = 'block';
+        }
+
+        function showReportingSection() {
+            document.getElementById('loadingSpinner').style.display = 'none';
+            document.getElementById('registerSection').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('reportingSection').style.display = 'block';
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            if (email && password) {
+                showSpinner()
+
+                const url = `http://localhost:3000/api/login`;
+                const data = {
+                    email: `${email}`,
+                    password: `${password}`
+                };
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data),
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(data);
+                        token = data.token;
+                        userId = data.userId;
+                        fetchWeatherReport();
+                        updateWeekTable(currentWeek);
+                        showReportingSection();
+                    } else {
+                        console.log(response);
+                        alert('Failed to login.');
+                        showLoginSection();
+                    }
+                } catch (error) {
+                    console.log(error);
+                    alert('Failed to login.');
+                    showLoginSection();
+                }
+            } else {
+                alert('Please enter valid credentials.');
+            }
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            if (email && password) {
+                try {
+                    showSpinner();
+                    const url = `http://localhost:3000/api/register`;
+                    const data = {
+                        email: `${email}`,
+                        password: `${password}`
+                    };
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data),
+                    });
+                    if (response.ok) {
+                        console.log('Registered');
+                        showLoginSection();
+                        window.location.href = "/index.html";
+                    } else {
+                        console.log(response);
+                        alert('Failed to register.');
+                        showRegisterSection();
+                    }
+                } catch (err) {
+                    console.log(err);
+                    alert('Failed to register');
+                    showRegisterSection();
+                }
+            } else {
+                alert('Please enter valid credentials.');
+            }
+        });
+
+        async function fetchWeatherReport() {
+            const url = `http://localhost:3002/api/weather`;
+            try {
+                fetch(url).then(async response => {
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(data);
+                        const weatherReport = document.getElementById('weatherReport');
+                        const tmp = document.getElementById('temp');
+                        const cond = document.getElementById('cond');
+                        const icon = document.getElementById('cond-icon');
+                        tmp.textContent = `Temperature: ${data.current.temp} \u2103`;
+                        cond.textContent = `Condition: ${data.current.weather[0].description}`
+                        icon.src = `http://openweathermap.org/img/wn/${data.current.weather[0].icon}.png`
+                        weatherReport.style.display = 'block';
+                    }
+                })
+            } catch (err) {
+
+            }
+        }
+
+        function getFirstDayOfYear(year) {
+            return new Date(year, 0, 1);
+        }
+
+        function getFirstDayOfWeek(year, weekNumber) {
+            const januaryFirst = getFirstDayOfYear(year);
+            const weekStart = new Date(januaryFirst.getTime() + ((weekNumber - 1) * 7) * 24 * 60 * 60 * 1000);
+            const dayOfWeek = januaryFirst.getDay();
+            const dayOffset = (dayOfWeek <= 1) ? 1 - dayOfWeek : 8 - dayOfWeek;
+            weekStart.setDate(weekStart.getDate() + dayOffset);
+            return weekStart;
+        }
+
+        function toggleInputEnabling(workInputs, vacationInputs, isPreviousMonth) {
+            function toggleOtherInput(input, otherInput, isPrevMonth) {
+                if (isPrevMonth) {
+                    return;
+                }
+
+                if (parseInt(input.value) > 0) {
+                    otherInput.disabled = true;
+                } else {
+                    if (!isPrevMonth) {
+                        otherInput.disabled = parseInt(otherInput.value) > 0;
+                    }
+                }
+            }
+
+            workInputs.forEach((input, index) => {
+                if (parseInt(input.value) > 0 || isPreviousMonth[index]) vacationInputs[index].disabled = true;
+                input.addEventListener('input', () => toggleOtherInput(input, vacationInputs[index], isPreviousMonth[index]));
+            });
+
+            vacationInputs.forEach((input, index) => {
+                if (parseInt(input.value) > 0 || isPreviousMonth[index]) workInputs[index].disabled = true;
+                input.addEventListener('input', () => toggleOtherInput(input, workInputs[index], isPreviousMonth[index]));
+            });
+        }
+
+
+        function createDaysRow(weekTable, week, weekStartDate, currentMonth) {
+            let row = weekTable.insertRow();
+            let weekCell = row.insertCell(0);
+            weekCell.innerHTML = `Week ${week}`;
+            let isPreviousMonth = [];
+
+            for (let day = 0; day < 7; day++) {
+                let currentDate = new Date(weekStartDate);
+                currentDate.setDate(weekStartDate.getDate() + day);
+                isPreviousMonth.push(currentDate.getMonth() < currentMonth);
+                let dayCell = row.insertCell(day + 1);
+                let dateSpan = document.createElement('span');
+                dateSpan.textContent = currentDate.toLocaleDateString("en-GB");
+                dayCell.appendChild(dateSpan);
+            }
+
+            return isPreviousMonth;
+        }
+
+        function createWorkHoursRow(weekTable, weekStartDate, daysData) {
+            let workHoursRow = weekTable.insertRow();
+            workHoursRow.insertCell(0).innerHTML = 'Work Hours';
+            let workHoursInputs = [];
+
+            for (let day = 0; day < 7; day++) {
+                let currentDate = new Date(weekStartDate);
+                currentDate.setDate(weekStartDate.getDate() + day);
+                let cell = workHoursRow.insertCell(day + 1);
+                let input = document.createElement('input');
+                input.classList.add('work-hours-input');
+                input.type = 'number';
+                input.min = '1';
+                input.max = '16';
+                input.className = 'work-hours';
+                input.value = daysData[day].hours_work;
+                cell.appendChild(input);
+                workHoursInputs.push(input);
+            }
+
+            return workHoursInputs;
+        }
+
+        function createVacationHoursRow(weekTable, weekStartDate, daysData) {
+            let vacationHoursRow = weekTable.insertRow();
+            vacationHoursRow.insertCell(0).innerHTML = 'Vacation Hours';
+            let vacationHoursInputs = [];
+
+            for (let day = 0; day < 7; day++) {
+                let currentDate = new Date(weekStartDate);
+                currentDate.setDate(weekStartDate.getDate() + day);
+                let cell = vacationHoursRow.insertCell(day + 1);
+                let input = document.createElement('input');
+                input.classList.add('vacation-hours-input');
+                input.type = 'number';
+                input.min = '1';
+                input.max = '16';
+                input.className = 'vacation-hours';
+                input.value = daysData[day].hours_vacation;
+                cell.appendChild(input);
+                vacationHoursInputs.push(input);
+            }
+
+            return vacationHoursInputs;
+        }
+
+        async function updateWeekTable(week) {
+            const currentMonth = new Date().getMonth();
+            const weekStartDate = getFirstDayOfWeek(year, week);
+            const daysData = await fetchTableDataForWeek(weekStartDate.toLocaleDateString("en-GB"));
+            if (daysData === null) {
+                return;
+            }
+            const tbody = document.getElementById('weekTable').getElementsByTagName('tbody')[0];
+            tbody.innerHTML = '';
+            
+            const isPreviousMonth = createDaysRow(tbody, week, weekStartDate, currentMonth);
+            const workHoursInputs = createWorkHoursRow(tbody, weekStartDate, daysData);
+            const vacationHoursInputs = createVacationHoursRow(tbody, weekStartDate, daysData);
+
+            toggleInputEnabling(workHoursInputs, vacationHoursInputs, isPreviousMonth);
+
+            document.getElementById('currentWeekLabel').innerText = `Week Starting: ${weekStartDate.toLocaleDateString("en-GB")}`;
+        }
+
+
+        document.getElementById('reportHoursBtn').addEventListener('click', async function () {
+            try {
+                const weekStartDate = getFirstDayOfWeek(year, currentWeek);
+                const url = `http://localhost:3001/api/report`;
+                const data = {
+                    weekStartDate: `${weekStartDate.toLocaleDateString("en-GB")}`,
+                    days: getDaysFromTable()
+                };
+                console.log(data);
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `bearer ${token}`
+                    },
+                    body: JSON.stringify(data),
+                });
+                if (response.ok) {
+                    alert('Successfully reported hours');
+                } else {
+                    alert('Failed to report hours.');
+                }
+            } catch (error) {
+                console.log(error);
+                alert('Failed to report hours.');
+            }
+        });
+
+
+        function getCurrentWeekNumber() {
+            const today = new Date();
+            const firstJan = getFirstDayOfYear(year);
+            const days = Math.floor((today - firstJan) / (24 * 60 * 60 * 1000));
+            const weekNumber = Math.ceil(days / 7);
+            return weekNumber;
+        }
+
+        function navigateWeeks(direction) {
+            const newWeek = currentWeek + direction;
+            const firstWeekOfYear = 1;
+            const lastWeekOfYear = 52;
+
+            if ((direction < 0 && newWeek >= firstWeekOfYear) || (direction > 0 && newWeek <= lastWeekOfYear)) {
+                currentWeek = newWeek;
+                updateWeekTable(currentWeek);
+            }
+        }
+
+        document.getElementById('prevWeek').addEventListener('click', function () {
+            navigateWeeks(-1);
+        });
+
+        document.getElementById('nextWeek').addEventListener('click', function () {
+            navigateWeeks(1);
+        });
+
+        function getDaysFromTable() {
+            const table = document.querySelector('#weekTable');
+            const workHoursInputs = table.querySelectorAll('.work-hours');
+            const vacationHoursInputs = table.querySelectorAll('.vacation-hours');
+            const daysData = [];
+
+            for (let i = 0; i < workHoursInputs.length; i++) {
+                const hoursWork = workHoursInputs[i].value ? parseInt(workHoursInputs[i].value, 10) : 0;
+                const hoursVacation = vacationHoursInputs[i].value ? parseInt(vacationHoursInputs[i].value, 10) : 0;
+
+                daysData.push({ hours_work: hoursWork, hours_vacation: hoursVacation });
+            }
+
+            return daysData;
+        }
+
+        document.getElementById('logoutButton').addEventListener('click', function () {
+            window.location.href = '/index.html'
+        });
+
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,49 @@
+version: '3.8'
+services:
+  login-db:
+    image: 'mongo'
+    env_file:
+      - ./env/mongo.env
+    volumes:
+      - login-data:/data/db
+  reporting-db:
+    image: 'mongo'
+    env_file:
+      - ./env/mongo.env
+    volumes:
+      - report-data:/data/db
+  login-service:
+    build: ./login-server
+    ports:
+      - '3000:3000'
+    env_file:
+      - ./env/backend.env
+    depends_on:
+      - login-db
+  reporting-service:
+    build: ./reporting-server
+    ports:
+      - '3001:3001'
+    env_file:
+      - ./env/backend.env
+    depends_on:
+      - reporting-db
+  weather-service:
+    build: ./weather-server
+    ports:
+      - '3002:3002'
+    env_file:
+      - ./env/backend.env
+  client-app:
+    build: ./client
+    ports:
+      - '8080:80'
+    env_file:
+      - ./env/frontend.env
+    depends_on:
+      - login-service
+      - reporting-service
+  
+volumes:
+  login-data:
+  report-data:

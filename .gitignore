@@ -1,0 +1,5 @@
+.idea
+.code
+doc/*.tmp
+doc/~*.docx
+**/node_modules
